@@ -1,4 +1,4 @@
-from typing import Tuple, List, Iterable, Callable, Union, Any
+from typing import Tuple, List, Iterable, Callable, Union, Any, ClassVar
 import os
 import warnings
 from dataclasses import dataclass
@@ -7,19 +7,24 @@ from datetime import datetime
 from collections import abc
 
 
-@dataclass
+@dataclass(frozen=True)
 class HUtil:
-    ID: uuid.UUID = uuid.uuid1()
-    now: datetime = datetime.now()
-    cwd: str = os.getcwd()
+    ID: ClassVar[uuid.UUID] = uuid.uuid1()
+    now: ClassVar[datetime] = datetime.now()
+    cwd: ClassVar[str] = os.getcwd()
+
+    @property
+    def ID_str(self):
+        return str(self.ID)
+
+    @property
+    def now_str(self):
+        return self.now.strftime("%m/%d/%Y, %H:%M:%S")
 
     def __post_init__(self):
         HUtil.check_type(self.ID, uuid.UUID)
         HUtil.check_type(self.now, datetime)
         HUtil.check_type(self.cwd, str)
-
-        self.ID_str = str(self.ID)
-        self.now_str = self.now.strftime("%m/%d/%Y, %H:%M:%S")
 
     @staticmethod
     def is_iterable(x: Any) -> bool:
@@ -58,7 +63,8 @@ class HUtil:
     @staticmethod
     def check_iterable_type(x: Iterable, dtype: Union[type, Tuple[type]], raise_error: bool = True, self_check: bool = True) -> bool:
         if self_check:
-            HUtil.check_type(x, abc.Iterable, raise_error=True, self_check=False)
+            HUtil.check_type(
+                x, abc.Iterable, raise_error=True, self_check=False)
         for i, item in enumerate(x):
             if not HUtil.check_type(item, dtype=dtype, raise_error=raise_error, self_check=False if i else True):
                 return False
@@ -102,11 +108,11 @@ class HUtil:
 
         contain_all_flag = HUtil.str_contain_all(s, contain_all)
         contain_any_flag = HUtil.str_contain_any(s, contain_any)
-        if len(contain_none)==1 and not contain_none[0]:
+        if len(contain_none) == 1 and not contain_none[0]:
             contain_none_flag = True
         else:
             contain_none_flag = (not HUtil.str_contain_any(s, contain_none))
-            
+
         return contain_all_flag and contain_any_flag and contain_none_flag
 
 
