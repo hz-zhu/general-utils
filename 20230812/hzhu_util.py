@@ -20,15 +20,15 @@ class HUtil:
     timers: ClassVar[List[int]] = list()  # Time in nanosecond since epoch
 
     @cached_property
-    def ID_str(self):
+    def ID_str(self) -> str:
         return str(self.ID)
 
     @cached_property
-    def now_str(self):
+    def now_str(self) -> str:
         return self.now.strftime("%m/%d/%Y %H:%M:%S")
 
     @property
-    def time(self):
+    def time(self) -> float:
         current_time = time.time_ns()
         self.timers.append(current_time)
         return (current_time-self.timers[-2])/10e9
@@ -134,7 +134,7 @@ class HUtil:
         return contain_all_flag and contain_any_flag and contain_none_flag
 
     @staticmethod
-    def ls(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x)):
+    def ls(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x))  -> List[str]:
         HUtil.check_type(path, str)
         HUtil.check_type(full_dir, bool)
         if sort_key:
@@ -145,7 +145,7 @@ class HUtil:
         return [os.path.join(path, item) for item in result] if full_dir else result
 
     @staticmethod
-    def ls_file(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x)):
+    def ls_file(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x)) -> List[str]:
         HUtil.check_type(path, str)
         HUtil.check_type(full_dir, bool)
         if sort_key:
@@ -155,7 +155,7 @@ class HUtil:
         return [rf if full_dir else r for r, rf in zip(result, result_full) if os.path.isdir(rf)]
 
     @staticmethod
-    def ls_dir(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x)):
+    def ls_dir(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x)) -> List[str]:
         HUtil.check_type(path, str)
         HUtil.check_type(full_dir, bool)
         if sort_key:
@@ -165,7 +165,7 @@ class HUtil:
         return [rf if full_dir else r for r, rf in zip(result, result_full) if os.path.isdir(rf)]
 
     @staticmethod
-    def extract_numbers(input_string):
+    def extract_numbers(input_string) -> List[Union[int, float]]:
         HUtil.check_type(input_string, str)
         # Regular expression for matching numbers
         number_pattern = r"-?[\d]*\.?\d+(?:[eE][-+]?\d+)?"
@@ -176,7 +176,7 @@ class HUtil:
 
     @staticmethod
     def ls_name(path: str = os.getcwd(), *, full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x),
-        contain_all: Iterable[str] = '', contain_any: Iterable[str] = '', contain_none: Iterable[str] = ''):
+        contain_all: Iterable[str] = '', contain_any: Iterable[str] = '', contain_none: Iterable[str] = '') -> List[str]:
         HUtil.check_type(path, str)
         HUtil.check_type(full_dir, bool)
         if sort_key:
