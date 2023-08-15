@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from collections import abc
 from functools import cached_property, partial
+import shutil
 
 
 @dataclass(frozen=True)
@@ -175,7 +176,7 @@ class HUtil:
 
     @staticmethod
     def ls_name(path: str = os.getcwd(), *, full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x),
-                contain_all: Iterable[str] = '', contain_any: Iterable[str] = '', contain_none: Iterable[str] = ''):
+        contain_all: Iterable[str] = '', contain_any: Iterable[str] = '', contain_none: Iterable[str] = ''):
         HUtil.check_type(path, str)
         HUtil.check_type(full_dir, bool)
         if sort_key:
@@ -188,6 +189,40 @@ class HUtil:
         result_full = [os.path.join(path, item) for item in result]
 
         return [rf if full_dir else r for r, rf in zip(result, result_full) if os.path.isdir(rf)]
+    
+    @staticmethod
+    def mkdir(*args, exist_warning: bool=True) -> str:
+        HUtil.check_iterable_type(args, str)
+        HUtil.check_type(exist_warning, bool)
 
+        path = os.path.join(*args)
+        if os.path.exists(path):
+            if exist_warning: warnings.warn(f"Folder {path} already exists.")
+            return path
+        else:
+            os.makedirs(path)
+            return path
+
+    @staticmethod
+    def newdir(*args, force_delete: bool=False, raise_error: bool=True) -> str:
+        HUtil.check_iterable_type(args, str)
+        HUtil.check_type(raise_error, bool)
+        HUtil.check_type(force_delete, bool)
+
+        path = os.path.join(*args)
+        if os.path.exists(path):
+            msg = f"Folder {path} already exists."
+            if raise_error: raise FileExistsError(msg)
+            else:
+                warnings.warn(msg)
+                if force_delete:
+                    shutil.rmtree(path)
+                    HUtil.mkdir(path, exist_warning=True)
+                    return path
+                else:
+                    return ''
+        else:
+            HUtil.mkdir(path, exist_warning=False)
+            return path
 
 hutil = HUtil()
