@@ -6,9 +6,10 @@ import uuid
 import re
 import time
 from datetime import datetime
-from collections import abc
+from collections import abc, Counter
 from functools import cached_property, partial
 import shutil
+import json
 
 
 @dataclass(frozen=True)
@@ -224,5 +225,42 @@ class HUtil:
         else:
             HUtil.mkdir(path, exist_warning=False)
             return path
+        
+    @staticmethod
+    def get_struct(x: Any) -> Union[dict, str]:
+        if isinstance(x, abc.Mapping):
+            result = dict()
+            for key, value in x.items():
+                recurse = HUtil.get_struct(value)
+                if recurse:
+                    result[f"{key} <{value.__class__.__name__}>"] = recurse
+                else:
+                    result[key] = value.__class__.__name__
+            return result
+        elif isinstance(x, str):
+            return x.__class__.__name__
+        elif isinstance(x, abc.Iterable):
+            res_hashable = []
+            res_unhashable = []
+            for item in x:
+                recurse = HUtil.get_struct(item)
+                if recurse:
+                    try:
+                        hash(recurse)
+                        res_hashable.append(recurse)
+                    except:
+                        res_unhashable.append(recurse)
+            result = []
+            if res_hashable: result.append(Counter(res_hashable))
+            if res_unhashable: result.append(res_unhashable)
+            return result
+
+        else:
+            return x.__class__.__name__
+        
+    @staticmethod
+    def disp_struct(x: Any) -> None:
+        res = json.dumps(HUtil.get_struct(x), indent=4)
+        print(res)
 
 hutil = HUtil()
