@@ -6,7 +6,7 @@ import uuid
 import re
 import time
 from datetime import datetime
-from collections import abc, Counter
+from collections import abc, Counter, UserList, UserDict
 from functools import cached_property, partial
 import shutil
 
@@ -18,7 +18,8 @@ class HUtil:
     start_time: ClassVar[datetime] = datetime.now()
     cwd: ClassVar[str] = os.getcwd()
     timers: ClassVar[List[int]] = list()  # Time in nanosecond since epoch
-    debug_: ClassVar[list] = [None] # Debug is enabled by default
+    # Debug is enabled by default, when enabled, hutil.disp() will print to screen
+    debug_: ClassVar[list] = [None]
 
     def disp(self, *args, **kwargs) -> None:
         if self.debug:
@@ -34,7 +35,7 @@ class HUtil:
         res += f"  {self.cwd = }\n"
         res += f"  {self.debug = }\n"
         return res
-    
+
     __repr__ = __str__
 
     @cached_property
@@ -44,15 +45,15 @@ class HUtil:
     @cached_property
     def start_time_str(self) -> str:
         return self.start_time.strftime("%Y%m%d|%H-%M-%S")
-    
+
     @property
     def debug(self) -> bool:
         return bool(self.debug_)
-    
+
     @property
     def now(self) -> datetime:
         return datetime.now()
-    
+
     @property
     def now_str(self, format="%m/%d/%Y %H:%M:%S") -> str:
         HUtil.check_type(format, str)
@@ -63,7 +64,7 @@ class HUtil:
         current_time = time.time_ns()
         self.timers.append(current_time)
         return (current_time-self.timers[-2])/10e9
-    
+
     def enable_debug(self) -> None:
         self.debug_.append(None)
 
@@ -108,6 +109,32 @@ class HUtil:
                 msg = f"Expecting object of either types {[item.__name__ for item in dtype]} yet get type [{x.__class__.__name__}]"
             else:
                 msg = f'Expecting object {x} of type "{dtype.__name__}" yet get type "{x.__class__.__name__}"'
+            if raise_error:
+                raise TypeError(msg)
+            else:
+                warnings.warn(msg)
+
+            return False
+        return True
+
+    @staticmethod
+    def check_iterable(x: Any, raise_error: bool = True, self_check: bool = True) -> bool:
+        return HUtil.check_type(x=x, dtype=abc.Iterable, raise_error=raise_error, self_check=self_check)
+
+    @staticmethod
+    def check_callable(x: Any, raise_error: bool = True, self_check: bool = True) -> bool:
+        return HUtil.check_type(x=x, dtype=abc.Callable, raise_error=raise_error, self_check=self_check)
+
+    @staticmethod
+    def check_dataclass(x: Any, raise_error: bool = True, self_check: bool = True) -> bool:
+        if self_check:
+            HUtil.check_type(raise_error, bool,
+                             raise_error=True, self_check=False)
+            HUtil.check_type(self_check, bool,
+                             raise_error=True, self_check=False)
+
+        if not is_dataclass(x):
+            msg = f'Expecting object {x} of type "dataclass" yet get type "{x.__class__.__name__}"'
             if raise_error:
                 raise TypeError(msg)
             else:
@@ -172,7 +199,7 @@ class HUtil:
         return contain_all_flag and contain_any_flag and contain_none_flag
 
     @staticmethod
-    def ls(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x))  -> List[str]:
+    def ls(path: str = os.getcwd(), full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x)) -> List[str]:
         HUtil.check_type(path, str)
         HUtil.check_type(full_dir, bool)
         if sort_key:
@@ -214,7 +241,7 @@ class HUtil:
 
     @staticmethod
     def ls_name(path: str = os.getcwd(), *, full_dir=False, sort_key=lambda x: (HUtil.extract_numbers(x), x),
-        contain_all: Iterable[str] = '', contain_any: Iterable[str] = '', contain_none: Iterable[str] = '') -> List[str]:
+                contain_all: Iterable[str] = '', contain_any: Iterable[str] = '', contain_none: Iterable[str] = '') -> List[str]:
         HUtil.check_type(path, str)
         HUtil.check_type(full_dir, bool)
         if sort_key:
@@ -227,22 +254,23 @@ class HUtil:
         result_full = [os.path.join(path, item) for item in result]
 
         return [rf if full_dir else r for r, rf in zip(result, result_full) if os.path.isdir(rf)]
-    
+
     @staticmethod
-    def mkdir(*args, exist_warning: bool=True) -> str:
+    def mkdir(*args, exist_warning: bool = True) -> str:
         HUtil.check_iterable_type(args, str)
         HUtil.check_type(exist_warning, bool)
 
         path = os.path.join(*args)
         if os.path.exists(path):
-            if exist_warning: warnings.warn(f"Folder {path} already exists.")
+            if exist_warning:
+                warnings.warn(f"Folder {path} already exists.")
             return path
         else:
             os.makedirs(path)
             return path
 
     @staticmethod
-    def newdir(*args, force_delete: bool=False, raise_error: bool=True) -> str:
+    def newdir(*args, force_delete: bool = False, raise_error: bool = True) -> str:
         HUtil.check_iterable_type(args, str)
         HUtil.check_type(raise_error, bool)
         HUtil.check_type(force_delete, bool)
@@ -250,7 +278,8 @@ class HUtil:
         path = os.path.join(*args)
         if os.path.exists(path):
             msg = f"Folder {path} already exists."
-            if raise_error: raise FileExistsError(msg)
+            if raise_error:
+                raise FileExistsError(msg)
             else:
                 warnings.warn(msg)
                 if force_delete:
@@ -262,49 +291,154 @@ class HUtil:
         else:
             HUtil.mkdir(path, exist_warning=False)
             return path
-        
+
     @staticmethod
     def disp_struct_full(x: Any) -> None:
         def recurse(x, depth):
-            if isinstance(x, str): return 'str'
+            if isinstance(x, str):
+                return 'str'
             if is_dataclass(x):
                 return recurse(asdict(x), depth=depth)
             elif isinstance(x, dict):
                 pad = '  '*depth
-                return '{\n'+pad+\
-                    (';\n'+pad).join(\
-                    (recurse(key, depth=depth+1)+':'+recurse(value, depth=depth+1)) \
-                    for key, value in x.items())\
-                    +'\n'+pad+'}'
+                return '{\n'+pad +\
+                    (';\n'+pad).join(
+                        (recurse(key, depth=depth+1) +
+                         ':'+recurse(value, depth=depth+1))
+                        for key, value in x.items())\
+                    + '\n'+pad+'}'
             elif isinstance(x, Iterable):
                 return '['+','.join((recurse(item, depth=depth+1) for item in x))+']'
             else:
                 return x.__class__.__name__
         hutil.disp(recurse(x, 0))
-    
+
     @staticmethod
-    def disp_struct(x: Any, sep: str=':   ') -> None:
+    def disp_struct(x: Any, sep: str = ':   ') -> None:
         hutil.check_type(sep, str)
+
         def recurse(x, depth):
             pad = sep*depth
-            if isinstance(x, str): return f"<{x.__class__.__name__}>"
+            if isinstance(x, str):
+                return f"<{x.__class__.__name__}>"
             if is_dataclass(x):
                 return f"<{x.__class__.__name__}>\n{pad}"+recurse(asdict(x), depth=depth)
             elif isinstance(x, dict):
-                return '{\n'+pad+\
-                    (';\n'+pad).join(\
-                    (str(key)+' '+recurse(key, depth=depth+1)+': '+recurse(value, depth=depth+1)) \
-                    for key, value in x.items())\
-                    +'\n'+pad+'}'
+                return '{\n'+pad +\
+                    (';\n'+pad).join(
+                        (str(key)+' '+recurse(key, depth=depth+1) +
+                         ': '+recurse(value, depth=depth+1))
+                        for key, value in x.items())\
+                    + '\n'+pad+'}'
             elif isinstance(x, Iterable):
                 local_structs = [recurse(item, depth=depth+1) for item in x]
                 local_counter = Counter(local_structs)
-                return '[\n'+pad+\
+                return '[\n'+pad +\
                     (',\n'+pad).join('x'+str(value)+' '+key for key, value in local_counter.items())\
-                    +'\n'+pad+']'
+                    + '\n'+pad+']'
             else:
                 return f"<{x.__class__.__name__}>"
         hutil.disp(recurse(x, 0))
 
-    
+
 hutil = HUtil()
+
+
+class HDataList(UserList):
+
+    def __init__(self, data: Union[Iterable, None] = None, dtype: Union[type, None] = None, force_type: bool = True):
+        if data:
+            hutil.check_iterable(data)
+        self.dtype = dtype
+        self.force_type = force_type
+        if self.dtype:
+            hutil.check_type(self.dtype, type)
+        hutil.check_type(self.force_type, bool)
+
+        super().__init__()
+        self.extend(data)
+
+    def append(self, item: Any) -> None:
+        if self.force_type:
+            if self:
+                hutil.check_type(item, self.dtype)
+            else:
+                hutil.check_dataclass(item)
+                self.dtype = item.__class__
+        super().append(item)
+
+    def __setitem__(self, idx: int, item: Any) -> None:
+        hutil.check_type(idx, int)
+        if self.force_type:
+            if self:
+                hutil.check_type(item, self.dtype)
+            else:
+                hutil.check_dataclass(item)
+                self.dtype = item.__class__
+        super().__setitem__(idx, item)
+
+    def extend(self, other: Iterable) -> None:
+        hutil.check_type(other, abc.Iterable)
+        for item in other:
+            if self.force_type:
+                if self:
+                    hutil.check_type(item, self.dtype)
+                else:
+                    self.dtype = item.__class__
+        return super().extend(other)
+
+    def to_expanded_list(self):
+        return [asdict(item) for item in self]
+
+
+class HDataDict(UserDict):
+
+    def __init__(self, 
+        data: Union[abc.Iterable, None] = None,
+        dtype: Union[type, None] = None, 
+        key_str: str = '',
+        force_type: bool = True,
+        no_replacement: bool = True):
+
+        if data:
+            hutil.check_type(data, abc.Iterable)
+        self.dtype = dtype
+        self.force_type = force_type
+        self.key_str = key_str
+        self.no_replacement = no_replacement
+        if self.dtype:
+            hutil.check_type(self.dtype, type)
+        hutil.check_type(self.force_type, bool)
+        hutil.check_type(self.key_str, str)
+        hutil.check_type(self.no_replacement, bool)
+
+        super().__init__()
+        if data:
+            for item in data: self.add(item)
+
+    def add(self, item: Any) -> None:
+        if self.force_type:
+            if self:
+                hutil.check_type(item, self.dtype)
+            else:
+                hutil.check_dataclass(item)
+                self.dtype = item.__class__
+        key = getattr(item, self.key_str) if self.key_str else len(self)
+        self.__setitem__(key, item)
+
+    def __setitem__(self, key, value) -> None:
+        if key in self and self.no_replacement:
+            raise ValueError(f"{key} already exists in HDataDict.")
+        super().__setitem__(key, value)
+
+    def to_list(self) -> list:
+        return list(self.data.values())
+
+    def to_data_list(self) -> HDataList:
+        return HDataList(self.data.values())
+    
+    def to_expanded_list(self) -> list:
+        return [asdict(value) for value in self.data.values()]
+    
+    def to_expanded_dict(self) -> dict:
+        return {key: asdict(value) for key, value in self.data.items()}
