@@ -12,7 +12,7 @@ class HImage(np.ndarray):
         if len(self.shape)>3 or len(self.shape)<2: raise ValueError(self.shape)
 
     def __array_finalize__(self, obj):
-        self.validataion
+        self.validataion()
 
     @classmethod
     def from_path(cls, path: str):
