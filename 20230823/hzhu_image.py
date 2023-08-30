@@ -5,6 +5,7 @@ import torch
 from dataclasses import dataclass
 from PIL import Image
 from matplotlib import pyplot as plt
+from typing import Union
 
 class HImage(np.ndarray):
 
@@ -14,13 +15,19 @@ class HImage(np.ndarray):
                               buffer, offset, strides, order)
         for key, value in kwargs.items():
             setattr(obj, key, value)
+        if not HImage.is_channel_last_image(obj): raise ValueError(obj.shape)
         return obj
 
     def check_shape(self):
         if len(self.shape)>3 or len(self.shape)<2: raise ValueError(self.shape)
+        if self.shape[0]<5: raise ValueError(self.shape)
 
-    def __array_finalize__(self, obj):
-        return
+    @staticmethod
+    def is_channel_last_image(x: Union[np.ndarray, torch.Tensor]) -> bool:
+        hutil.check_type(x, (np.ndarray, torch.Tensor))
+        if len(x.shape)>3 or len(x.shape)<2: return False
+        if x.shape[0]<5: return False
+        return True   
     
     def cls_decorator(method, *margs, **mkwargs):
         def decorator(func):
