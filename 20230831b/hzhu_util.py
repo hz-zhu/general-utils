@@ -478,7 +478,7 @@ class HDataList(UserList):
         hutil.check_type(self.force_type, bool)
 
         super().__init__()
-        self.extend(data)
+        if data: self.extend(data)
 
     def append(self, item: Any) -> None:
         if self.force_type:

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from PIL import Image
 from matplotlib import pyplot as plt
 from typing import Union, Iterable, Tuple
-from functools import cached_property
+from functools import cached_property, cache
 from collections import abc
 
 HNumericType = Union[int, float, bool, np.number]
@@ -14,6 +14,12 @@ HArrayType = Union[Iterable, np.ndarray, torch.Tensor, Image.Image]
 
 
 class HArray(np.ndarray):
+
+    @staticmethod
+    @cache
+    def _np_attributes():
+        return {item:None for item in dir(np.ndarray)}
+
     def __new__(cls, src: HArrayType, deep_copy: bool = False, **kwargs):
         hutil.check_type(deep_copy, bool)
         hutil.check_type(src, (abc.Iterable, np.ndarray, torch.Tensor, Image.Image))
@@ -23,7 +29,7 @@ class HArray(np.ndarray):
             obj = np.asanyarray(src).view(cls)
         obj._new_attr_dict = kwargs
         for key, value in obj._new_attr_dict.items():
-            if hasattr(obj, key):
+            if key in HArray._np_attributes():
                 raise ValueError(f'attribute "{key}" already exits.')
             setattr(obj, key, value)
         return obj
@@ -43,7 +49,7 @@ class HArray(np.ndarray):
 
 class HVec(HArray):
     @staticmethod
-    def _check_shape(x):
+    def _check(x):
         if len(x.shape) != 1:
             raise ValueError(x.shape)
 
@@ -54,17 +60,17 @@ class HVec(HArray):
         **kwargs,
     ):
         obj = super().__new__(cls, src=src, deep_copy=deep_copy, **kwargs)
-        cls._check_shape(obj)
+        cls._check(obj)
         return obj
 
     def __array_finalize__(self, obj):
         super().__array_finalize__(obj)
-        self.__class__._check_shape(self)
+        self.__class__._check(self)
 
 
 class HVec2(HVec):
     @staticmethod
-    def _check_shape(x):
+    def _check(x):
         if len(x.shape) != 1:
             raise ValueError(x.shape)
         if x.shape[0] != 2:
@@ -89,7 +95,7 @@ class HVec2(HVec):
 
 class HVec3(HVec2):
     @staticmethod
-    def _check_shape(x):
+    def _check(x):
         if len(x.shape) != 1:
             raise ValueError(x.shape)
         if x.shape[0] != 3:
@@ -106,7 +112,7 @@ class HVec3(HVec2):
 
 class HVec4(HVec3):
     @staticmethod
-    def _check_shape(x):
+    def _check(x):
         if len(x.shape) != 1:
             raise ValueError(x.shape)
         if x.shape[0] != 4:
@@ -123,7 +129,7 @@ class HVec4(HVec3):
 
 class HImage(HArray):
     @staticmethod
-    def _check_shape(x):
+    def _check(x):
         if not x.shape:
             return
         if len(x.shape) <= 1 or len(x.shape) > 3:
@@ -142,12 +148,12 @@ class HImage(HArray):
         obj = super().__new__(
             cls, src=src, deep_copy=deep_copy, _deep_copy=deep_copy, **kwargs
         )
-        cls._check_shape(obj)
+        cls._check(obj)
         return obj
 
     def __array_finalize__(self, obj):
         super().__array_finalize__(obj)
-        self.__class__._check_shape(self)
+        self.__class__._check(self)
 
     @classmethod
     def from_path(cls, path: str):
@@ -178,6 +184,20 @@ class HImage(HArray):
         return result
 
     def __str__(self):
-        return f"{self.__class__}, {self.shape=}, {self._deep_copy=}"
+        return f"{self.__class__} [{self.shape=}, {self._deep_copy=}]"
 
     __repr__ = __str__
+
+
+class HMask(HImage):
+    @staticmethod
+    def _check(x):
+        if not x.shape:
+            return
+        if len(x.shape) <= 1 or len(x.shape) >= 3:
+            raise ValueError(x.shape)
+        if x.dtype!=np.bool_ and x.dtype!=bool:
+            raise TypeError(x.dtype)
+        
+    def to_torch(self, deep_copy=True):
+        return torch.tensor(self) if deep_copy else torch.from_numpy(self)
